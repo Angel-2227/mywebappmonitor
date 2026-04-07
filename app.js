@@ -41,12 +41,13 @@ let currentUser = null;
 let allPages = [];
 let allGroups = [];
 let currentFilter = "all";
-let currentGroupFilter = null; // null = todos los grupos
+let currentGroupFilter = null;
 let editingPageId = null;
 let editingGroupId = null;
 let selectedEmoji = "📁";
 let currentFilesPageId = null;
 let viewingFileId = null;
+let filesGroupFilter = null; // filtro de grupo en vista archivos
 
 // ─────────────────────────────────────────────
 //  AUTH
@@ -91,7 +92,10 @@ window.switchView = (viewName, btn) => {
   document.getElementById("view-" + viewName).classList.remove("hidden");
   if (btn) btn.classList.add("active");
   if (viewName === "viewer") populateViewerSelect();
-  if (viewName === "files") populateFilesPageSelect();
+  if (viewName === "files") {
+    populateFilesPageSelect();
+    renderFilesGroupFilter();
+  }
 };
 
 // ─────────────────────────────────────────────
@@ -143,10 +147,8 @@ function populateGroupSelect() {
 
 window.filterByGroup = (groupId, btn) => {
   currentGroupFilter = groupId;
-  // Quitar active-group de todos
   document.querySelectorAll(".group-nav-item, .active-group").forEach(b => b.classList.remove("active-group"));
   if (btn) btn.classList.add("active-group");
-  // Actualizar título
   if (groupId === null) {
     document.getElementById("dashboard-title").textContent = "Mis páginas";
   } else {
@@ -216,7 +218,6 @@ window.deleteGroup = async (id) => {
   if (!confirm("¿Eliminar este grupo? Las páginas del grupo no se eliminarán.")) return;
   try {
     await deleteDoc(doc(db, "users", currentUser.uid, "groups", id));
-    // Quitar groupId de páginas que lo tengan
     const pagesInGroup = allPages.filter(p => p.groupId === id);
     await Promise.all(pagesInGroup.map(p =>
       updateDoc(doc(db, "users", currentUser.uid, "pages", p.id), { groupId: "" })
@@ -282,7 +283,6 @@ function renderPages() {
       ? `<span class="tag tag-group">${group.emoji || "📁"} ${escHtml(group.name)}</span>`
       : "";
 
-    // Preview: intentar iframe real; fallback a patrón
     const previewHtml = page.url ? `
       <div class="preview-iframe-wrap">
         <iframe src="${escHtml(page.url)}" loading="lazy" sandbox="allow-same-origin allow-scripts" title="preview"></iframe>
@@ -381,8 +381,7 @@ window.savePage = async () => {
   if (!name || !url) { showToast("Nombre y URL son obligatorios", "error"); return; }
 
   const data = {
-    name,
-    url,
+    name, url,
     provider: document.getElementById("page-provider").value,
     status: document.getElementById("page-status").value,
     groupId: document.getElementById("page-group").value,
@@ -410,7 +409,6 @@ window.savePage = async () => {
 window.deletePage = async (id) => {
   if (!confirm("¿Eliminar esta página del panel?")) return;
   try {
-    // Eliminar también sus archivos
     const filesSnap = await getDocs(collection(db, "users", currentUser.uid, "pages", id, "files"));
     await Promise.all(filesSnap.docs.map(d => deleteDoc(d.ref)));
     await deleteDoc(doc(db, "users", currentUser.uid, "pages", id));
@@ -459,27 +457,71 @@ window.openInViewer = (url, name) => {
 };
 
 // ─────────────────────────────────────────────
+//  ARCHIVOS — filtro por grupo
+// ─────────────────────────────────────────────
+function renderFilesGroupFilter() {
+  const container = document.getElementById("files-group-filter");
+  if (!container) return;
+  container.innerHTML = "";
+
+  // Botón "Todas"
+  const allBtn = document.createElement("button");
+  allBtn.className = "filter-chip" + (filesGroupFilter === null ? " active" : "");
+  allBtn.textContent = "Todas";
+  allBtn.onclick = () => {
+    filesGroupFilter = null;
+    populateFilesPageSelect();
+    renderFilesGroupFilter();
+  };
+  container.appendChild(allBtn);
+
+  allGroups.forEach(g => {
+    const btn = document.createElement("button");
+    btn.className = "filter-chip" + (filesGroupFilter === g.id ? " active" : "");
+    btn.textContent = (g.emoji || "📁") + " " + g.name;
+    btn.onclick = () => {
+      filesGroupFilter = g.id;
+      populateFilesPageSelect();
+      renderFilesGroupFilter();
+    };
+    container.appendChild(btn);
+  });
+}
+
+// ─────────────────────────────────────────────
 //  ARCHIVOS (almacenados en Firestore como texto)
 // ─────────────────────────────────────────────
 const FILE_ICONS = { html: "🌐", css: "🎨", js: "⚡", json: "📋", txt: "📄", other: "📎" };
-const FILE_SIZE_LIMIT = 900000; // ~900KB (Firestore doc limit es 1MB)
+const FILE_SIZE_LIMIT = 900000;
 
 function populateFilesPageSelect() {
   const sel = document.getElementById("files-page-select");
   const current = sel.value;
   sel.innerHTML = '<option value="">— Selecciona una página —</option>';
-  allPages.forEach(p => {
+
+  let pages = allPages;
+  if (filesGroupFilter !== null) {
+    pages = pages.filter(p => p.groupId === filesGroupFilter);
+  }
+
+  pages.forEach(p => {
     const opt = document.createElement("option");
     opt.value = p.id;
     opt.textContent = p.name;
     sel.appendChild(opt);
   });
-  if (current) sel.value = current;
+  if (current && pages.find(p => p.id === current)) {
+    sel.value = current;
+  } else if (current) {
+    // la página actual quedó fuera del filtro, limpiar
+    loadFilesForPage("");
+  }
 }
 
 window.goToFiles = (pageId) => {
   switchView("files", document.querySelector('[data-view="files"]'));
   populateFilesPageSelect();
+  renderFilesGroupFilter();
   document.getElementById("files-page-select").value = pageId;
   loadFilesForPage(pageId);
 };
@@ -488,10 +530,12 @@ window.loadFilesForPage = async (pageId) => {
   currentFilesPageId = pageId;
   const section = document.getElementById("files-section");
   const btn = document.getElementById("btn-upload-file");
+  const btnZip = document.getElementById("btn-download-zip");
   const countEl = document.getElementById("files-count");
 
   if (!pageId) {
     btn.style.display = "none";
+    btnZip.style.display = "none";
     section.innerHTML = '<div class="empty-state"><p>Selecciona una página para ver o subir sus archivos.</p></div>';
     countEl.textContent = "";
     return;
@@ -503,53 +547,214 @@ window.loadFilesForPage = async (pageId) => {
   try {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "pages", pageId, "files"));
     if (snap.empty) {
-      section.innerHTML = `
+      section.innerHTML = buildDropZoneHtml() + `
         <div class="file-upload-info">
           <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          Los archivos se guardan en Firestore. Puedes subir HTML, CSS, JS, JSON y texto. Límite: ~900KB por archivo.
+          Los archivos se guardan en Firestore. Límite ~900KB por archivo. Puedes arrastrar archivos o carpetas enteras aquí.
         </div>
-        <div class="empty-state"><p>No hay archivos en esta página. Sube uno con el botón de arriba.</p></div>`;
+        <div class="empty-state"><p>No hay archivos. Arrástralos aquí o usa el botón de arriba.</p></div>`;
+      btnZip.style.display = "none";
       countEl.textContent = "0 archivos";
+      setupDropZone();
       return;
     }
 
     const files = [];
     snap.forEach(d => files.push({ id: d.id, ...d.data() }));
     countEl.textContent = files.length + " archivo" + (files.length !== 1 ? "s" : "");
+    btnZip.style.display = "";
 
-    section.innerHTML = `
-      <div class="file-upload-info">
-        <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Los archivos se guardan en Firestore. Puedes subir HTML, CSS, JS, JSON y texto. Límite: ~900KB por archivo.
-      </div>
-      <div class="files-grid" id="files-grid"></div>`;
-
-    const grid = document.getElementById("files-grid");
-    files.forEach(file => {
-      const card = document.createElement("div");
-      card.className = "file-card";
-      const icon = FILE_ICONS[file.type] || FILE_ICONS.other;
-      const size = file.content ? Math.round(new Blob([file.content]).size / 1024) : 0;
-      card.innerHTML = `
-        <div class="file-icon">${icon}</div>
-        <div class="file-card-name">${escHtml(file.name)}</div>
-        <div class="file-card-size">${size} KB · ${file.type || "?"}</div>
-        <div class="file-card-actions">
-          <button class="btn-secondary btn-sm" onclick="openFileView('${file.id}')">Ver / editar</button>
-          <button class="btn-icon-sm btn-danger" onclick="deleteFile('${file.id}')" title="Eliminar">
-            <svg width="12" height="12" viewBox="0 0 16 16"><path d="M3 5h10M6 5V3h4v2M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
-          </button>
-        </div>
-      `;
-      grid.appendChild(card);
+    // Agrupar por carpeta (path)
+    const byFolder = {};
+    files.forEach(f => {
+      const folder = f.folder || "";
+      if (!byFolder[folder]) byFolder[folder] = [];
+      byFolder[folder].push(f);
     });
+
+    const sortedFolders = Object.keys(byFolder).sort((a, b) => {
+      if (a === "") return -1;
+      if (b === "") return 1;
+      return a.localeCompare(b);
+    });
+
+    let html = buildDropZoneHtml();
+    html += `<div class="file-upload-info">
+      <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+      Arrastra más archivos o carpetas al área de abajo para agregarlos.
+    </div>`;
+
+    sortedFolders.forEach(folder => {
+      const folderFiles = byFolder[folder];
+      if (folder) {
+        html += `<div class="folder-section">
+          <div class="folder-header">
+            <svg width="14" height="14" viewBox="0 0 16 16"><path d="M1 4a1 1 0 011-1h4l2 2h6a1 1 0 011 1v7a1 1 0 01-1 1H2a1 1 0 01-1-1V4z" fill="currentColor" opacity=".15" stroke="currentColor" stroke-width="1.2"/></svg>
+            ${escHtml(folder)}
+            <span class="folder-count">${folderFiles.length}</span>
+          </div>
+          <div class="files-grid">`;
+      } else {
+        html += `<div class="files-grid" style="margin-bottom:16px;">`;
+      }
+
+      folderFiles.forEach(file => {
+        const icon = FILE_ICONS[file.type] || FILE_ICONS.other;
+        const size = file.content ? Math.round(new Blob([file.content]).size / 1024) : (file.sizeKb || 0);
+        html += `<div class="file-card">
+          <div class="file-icon">${icon}</div>
+          <div class="file-card-name" title="${escHtml(file.name)}">${escHtml(file.name)}</div>
+          <div class="file-card-size">${size} KB · ${file.type || "?"}</div>
+          <div class="file-card-actions">
+            <button class="btn-secondary btn-sm" onclick="openFileView('${file.id}')">Ver / editar</button>
+            <button class="btn-icon-sm btn-danger" onclick="deleteFile('${file.id}')" title="Eliminar">
+              <svg width="12" height="12" viewBox="0 0 16 16"><path d="M3 5h10M6 5V3h4v2M6 8v5M10 8v5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" fill="none"/></svg>
+            </button>
+          </div>
+        </div>`;
+      });
+
+      html += `</div>`;
+      if (folder) html += `</div>`;
+    });
+
+    section.innerHTML = html;
+    setupDropZone();
   } catch (e) {
     section.innerHTML = `<div class="empty-state"><p>Error al cargar archivos: ${escHtml(e.message)}</p></div>`;
   }
 };
 
+function buildDropZoneHtml() {
+  return `<div class="drop-zone" id="drop-zone">
+    <div class="drop-zone-inner">
+      <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+        <path d="M16 22V10M16 10L11 15M16 10L21 15" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/>
+        <path d="M6 22v2a2 2 0 002 2h16a2 2 0 002-2v-2" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/>
+      </svg>
+      <p>Arrastra archivos o carpetas aquí</p>
+      <span>Se detecta la estructura automáticamente</span>
+    </div>
+  </div>`;
+}
+
+// ─────────────────────────────────────────────
+//  DRAG & DROP — archivos y carpetas
+// ─────────────────────────────────────────────
+function setupDropZone() {
+  const zone = document.getElementById("drop-zone");
+  if (!zone) return;
+
+  zone.addEventListener("dragenter", e => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragover",  e => { e.preventDefault(); zone.classList.add("drag-over"); });
+  zone.addEventListener("dragleave", e => { if (!zone.contains(e.relatedTarget)) zone.classList.remove("drag-over"); });
+  zone.addEventListener("drop", async e => {
+    e.preventDefault();
+    zone.classList.remove("drag-over");
+    if (!currentFilesPageId) { showToast("Selecciona una página primero", "error"); return; }
+    await processDroppedItems(e.dataTransfer.items);
+  });
+}
+
+async function processDroppedItems(items) {
+  if (!items || items.length === 0) return;
+  showToast("Procesando archivos...", "success");
+
+  const fileList = []; // { file, path }
+
+  async function traverseEntry(entry, basePath = "") {
+    if (entry.isFile) {
+      return new Promise(resolve => {
+        entry.file(file => {
+          fileList.push({ file, path: basePath });
+          resolve();
+        });
+      });
+    } else if (entry.isDirectory) {
+      const reader = entry.createReader();
+      return new Promise(resolve => {
+        const readAll = (entries = []) => {
+          reader.readEntries(async batch => {
+            if (batch.length === 0) {
+              const promises = entries.map(e => traverseEntry(e, basePath ? basePath + "/" + entry.name : entry.name));
+              await Promise.all(promises);
+              resolve();
+            } else {
+              readAll([...entries, ...batch]);
+            }
+          });
+        };
+        readAll();
+      });
+    }
+  }
+
+  const entries = Array.from(items)
+    .filter(item => item.kind === "file")
+    .map(item => item.webkitGetAsEntry ? item.webkitGetAsEntry() : null)
+    .filter(Boolean);
+
+  await Promise.all(entries.map(e => traverseEntry(e)));
+
+  if (fileList.length === 0) { showToast("No se encontraron archivos", "error"); return; }
+
+  // Subir todos
+  let uploaded = 0;
+  let errors = 0;
+  for (const { file, path } of fileList) {
+    try {
+      await uploadFileObject(file, path);
+      uploaded++;
+    } catch (e) {
+      errors++;
+      console.error("Error subiendo", file.name, e);
+    }
+  }
+
+  const msg = errors > 0
+    ? `${uploaded} archivos subidos, ${errors} errores`
+    : `${uploaded} archivo${uploaded !== 1 ? "s" : ""} subido${uploaded !== 1 ? "s" : ""} correctamente`;
+  showToast(msg, errors > 0 ? "error" : "success");
+  loadFilesForPage(currentFilesPageId);
+}
+
+async function uploadFileObject(file, folder = "") {
+  const ext = file.name.split(".").pop().toLowerCase();
+  const typeMap = { html: "html", css: "css", js: "js", json: "json", txt: "txt" };
+  const type = typeMap[ext] || "other";
+
+  const content = await readFileAsText(file);
+  const sizeBytes = new Blob([content]).size;
+
+  if (sizeBytes > FILE_SIZE_LIMIT) {
+    throw new Error(`${file.name} supera el límite de 900KB`);
+  }
+
+  await addDoc(collection(db, "users", currentUser.uid, "pages", currentFilesPageId, "files"), {
+    name: file.name,
+    type,
+    folder,
+    content,
+    sizeKb: Math.round(sizeBytes / 1024),
+    createdAt: new Date().toISOString()
+  });
+}
+
+function readFileAsText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = e => resolve(e.target.result);
+    reader.onerror = () => reject(new Error("Error al leer " + file.name));
+    reader.readAsText(file);
+  });
+}
+
+// ─────────────────────────────────────────────
+//  MODAL SUBIR ARCHIVO (individual)
+// ─────────────────────────────────────────────
 window.openFileUploadModal = () => {
   document.getElementById("file-name").value = "";
+  document.getElementById("file-folder").value = "";
   document.getElementById("file-type").value = "html";
   document.getElementById("file-content").value = "";
   document.getElementById("modal-file").classList.remove("hidden");
@@ -562,16 +767,13 @@ window.closeFileModal = () => {
 window.loadLocalFile = (input) => {
   const file = input.files[0];
   if (!file) return;
-  // Auto-detectar tipo
   const ext = file.name.split(".").pop().toLowerCase();
   const typeMap = { html: "html", css: "css", js: "js", json: "json", txt: "txt" };
   document.getElementById("file-type").value = typeMap[ext] || "other";
   document.getElementById("file-name").value = file.name;
 
   const reader = new FileReader();
-  reader.onload = e => {
-    document.getElementById("file-content").value = e.target.result;
-  };
+  reader.onload = e => { document.getElementById("file-content").value = e.target.result; };
   reader.readAsText(file);
 };
 
@@ -580,6 +782,7 @@ window.saveFile = async () => {
   const name = document.getElementById("file-name").value.trim();
   const content = document.getElementById("file-content").value;
   const type = document.getElementById("file-type").value;
+  const folder = document.getElementById("file-folder").value.trim();
 
   if (!name) { showToast("El nombre del archivo es obligatorio", "error"); return; }
   if (!content) { showToast("El contenido no puede estar vacío", "error"); return; }
@@ -592,7 +795,7 @@ window.saveFile = async () => {
 
   try {
     await addDoc(collection(db, "users", currentUser.uid, "pages", currentFilesPageId, "files"), {
-      name, type, content,
+      name, type, folder, content,
       sizeKb: Math.round(sizeBytes / 1024),
       createdAt: new Date().toISOString()
     });
@@ -604,13 +807,16 @@ window.saveFile = async () => {
   }
 };
 
+// ─────────────────────────────────────────────
+//  VER / EDITAR ARCHIVO
+// ─────────────────────────────────────────────
 window.openFileView = async (fileId) => {
   if (!currentFilesPageId) return;
   viewingFileId = fileId;
   try {
     const snap = await getDoc(doc(db, "users", currentUser.uid, "pages", currentFilesPageId, "files", fileId));
     const data = snap.data();
-    document.getElementById("file-view-name").textContent = data.name;
+    document.getElementById("file-view-name").textContent = data.folder ? data.folder + "/" + data.name : data.name;
     document.getElementById("file-view-content").value = data.content || "";
     document.getElementById("modal-file-view").classList.remove("hidden");
   } catch (e) {
@@ -646,7 +852,7 @@ window.updateFileContent = async () => {
 };
 
 window.downloadFile = () => {
-  const name = document.getElementById("file-view-name").textContent;
+  const name = document.getElementById("file-view-name").textContent.split("/").pop();
   const content = document.getElementById("file-view-content").value;
   const blob = new Blob([content], { type: "text/plain" });
   const a = document.createElement("a");
@@ -664,6 +870,44 @@ window.deleteFile = async (fileId) => {
     loadFilesForPage(currentFilesPageId);
   } catch (e) {
     showToast("Error: " + e.message, "error");
+  }
+};
+
+// ─────────────────────────────────────────────
+//  DESCARGA EN ZIP
+// ─────────────────────────────────────────────
+window.downloadZip = async () => {
+  if (!currentFilesPageId) return;
+  showToast("Preparando ZIP...", "success");
+
+  try {
+    const snap = await getDocs(collection(db, "users", currentUser.uid, "pages", currentFilesPageId, "files"));
+    if (snap.empty) { showToast("No hay archivos para descargar", "error"); return; }
+
+    // Usar JSZip desde CDN
+    const { default: JSZip } = await import("https://cdn.jsdelivr.net/npm/jszip@3.10.1/+esm");
+    const zip = new JSZip();
+
+    const page = allPages.find(p => p.id === currentFilesPageId);
+    const folderName = page ? page.name.replace(/[^a-zA-Z0-9_-]/g, "_") : "archivos";
+    const root = zip.folder(folderName);
+
+    snap.forEach(d => {
+      const data = d.data();
+      const content = data.content || "";
+      const path = data.folder ? data.folder + "/" + data.name : data.name;
+      root.file(path, content);
+    });
+
+    const blob = await zip.generateAsync({ type: "blob" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = folderName + ".zip";
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast("ZIP descargado");
+  } catch (e) {
+    showToast("Error al generar ZIP: " + e.message, "error");
   }
 };
 
@@ -772,8 +1016,7 @@ window.saveKey = async () => {
   try {
     const encrypted = await encryptValue(currentUser.uid, value);
     await addDoc(collection(db, "users", currentUser.uid, "keys"), {
-      name,
-      value: encrypted,
+      name, value: encrypted,
       project: document.getElementById("key-project").value.trim(),
       createdAt: new Date().toISOString()
     });
@@ -799,10 +1042,8 @@ window.closeModalOutside = (e, id) => {
 
 function escHtml(str) {
   return (str || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;");
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 function escAttr(str) {

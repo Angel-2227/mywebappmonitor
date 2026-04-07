@@ -150,12 +150,22 @@
           <span class="topbar-count" id="files-count"></span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <select id="files-page-select" class="select-inline" onchange="loadFilesForPage(this.value)">
-            <option value="">— Selecciona una página —</option>
-          </select>
+          <button class="btn-icon" id="btn-download-zip" onclick="downloadZip()" style="display:none;" title="Descargar todo como ZIP">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 2v8M8 10l-3-3M8 10l3-3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/><path d="M2 12v1a1 1 0 001 1h10a1 1 0 001-1v-1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
+            ZIP
+          </button>
           <button class="btn-primary" id="btn-upload-file" onclick="openFileUploadModal()" style="display:none;">+ Subir archivo</button>
         </div>
       </div>
+
+      <!-- Filtro de grupos para archivos -->
+      <div class="files-group-bar">
+        <div id="files-group-filter" class="filter-chips"></div>
+        <select id="files-page-select" class="select-inline" onchange="loadFilesForPage(this.value)">
+          <option value="">— Selecciona una página —</option>
+        </select>
+      </div>
+
       <div class="files-section" id="files-section">
         <div class="empty-state"><p>Selecciona una página para ver o subir sus archivos.</p></div>
       </div>
@@ -167,12 +177,12 @@
         <h2>API Keys</h2>
         <button class="btn-primary" onclick="openKeyModal()">+ Nueva key</button>
       </div>
-      <div class="keys-list" id="keys-list">
-        <div class="empty-state"><p>No hay API Keys guardadas.</p></div>
-      </div>
       <div class="keys-note">
         <svg width="14" height="14" viewBox="0 0 16 16"><circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M8 7v4M8 5v.5" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-        Las keys se guardan en Firestore cifradas bajo tu UID. Solo tú, autenticado, puedes leerlas.
+        Las keys se cifran con AES-256-GCM usando tu UID antes de guardarse en Firestore.
+      </div>
+      <div class="keys-list" id="keys-list">
+        <div class="empty-state"><p>No hay API Keys guardadas.</p></div>
       </div>
     </div>
 
@@ -266,6 +276,8 @@
     <div class="modal-body">
       <label>Nombre del archivo</label>
       <input type="text" id="file-name" placeholder="index.html, app.js, style.css..."/>
+      <label>Carpeta (opcional)</label>
+      <input type="text" id="file-folder" placeholder="css, js, imgs... (dejar vacío para raíz)"/>
       <label>Tipo</label>
       <select id="file-type">
         <option value="html">HTML</option>
