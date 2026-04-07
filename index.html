@@ -55,6 +55,10 @@
         <svg width="15" height="15" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 3V13" stroke="currentColor" stroke-width="1.5"/></svg>
         Visor
       </button>
+      <button class="nav-item" data-view="files" onclick="switchView('files', this)">
+        <svg width="15" height="15" viewBox="0 0 16 16"><path d="M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 2v4h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
+        Archivos
+      </button>
       <button class="nav-item" data-view="keys" onclick="switchView('keys', this)">
         <svg width="15" height="15" viewBox="0 0 16 16"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9.5 9.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         API Keys
@@ -62,17 +66,28 @@
     </nav>
 
     <div class="sidebar-filters">
-      <span class="nav-label">Filtrar</span>
-      <button class="filter-btn active" onclick="filterPages('all', this)">Todas</button>
-      <button class="filter-btn" onclick="filterPages('online', this)">
+      <span class="nav-label">Estado</span>
+      <button class="filter-btn active" onclick="filterPages('all', this)" data-filter="all">Todas</button>
+      <button class="filter-btn" onclick="filterPages('online', this)" data-filter="online">
         <span class="dot dot-green"></span> En línea
       </button>
-      <button class="filter-btn" onclick="filterPages('dev', this)">
+      <button class="filter-btn" onclick="filterPages('dev', this)" data-filter="dev">
         <span class="dot dot-amber"></span> Dev
       </button>
-      <button class="filter-btn" onclick="filterPages('offline', this)">
+      <button class="filter-btn" onclick="filterPages('offline', this)" data-filter="offline">
         <span class="dot dot-gray"></span> Inactivas
       </button>
+    </div>
+
+    <div class="sidebar-groups">
+      <div class="sidebar-groups-header">
+        <span class="nav-label">Grupos</span>
+        <button class="btn-new-group" onclick="openGroupModal()" title="Nuevo grupo">+</button>
+      </div>
+      <button class="filter-btn active-group" onclick="filterByGroup(null, this)" data-group="__all__">
+        Todos los grupos
+      </button>
+      <div id="groups-nav"></div>
     </div>
 
     <div class="sidebar-footer">
@@ -89,7 +104,10 @@
     <!-- VISTA: DASHBOARD -->
     <div id="view-dashboard" class="view active">
       <div class="topbar">
-        <h2>Mis páginas</h2>
+        <div class="topbar-left">
+          <h2 id="dashboard-title">Mis páginas</h2>
+          <span class="topbar-count" id="pages-count"></span>
+        </div>
         <button class="btn-primary" onclick="openModal()">+ Nueva página</button>
       </div>
       <div class="pages-grid" id="pages-grid">
@@ -121,6 +139,25 @@
           </div>
           <iframe id="viewer-iframe" src="" class="hidden" title="Visor de página"></iframe>
         </div>
+      </div>
+    </div>
+
+    <!-- VISTA: ARCHIVOS -->
+    <div id="view-files" class="view hidden">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Archivos</h2>
+          <span class="topbar-count" id="files-count"></span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="files-page-select" class="select-inline" onchange="loadFilesForPage(this.value)">
+            <option value="">— Selecciona una página —</option>
+          </select>
+          <button class="btn-primary" id="btn-upload-file" onclick="openFileUploadModal()" style="display:none;">+ Subir archivo</button>
+        </div>
+      </div>
+      <div class="files-section" id="files-section">
+        <div class="empty-state"><p>Selecciona una página para ver o subir sus archivos.</p></div>
       </div>
     </div>
 
@@ -167,6 +204,10 @@
         <option value="dev">En desarrollo</option>
         <option value="offline">Inactiva</option>
       </select>
+      <label>Grupo</label>
+      <select id="page-group">
+        <option value="">Sin grupo</option>
+      </select>
       <label>Cuenta asociada</label>
       <select id="page-account">
         <option value="principal">Principal (juanrubio2277)</option>
@@ -179,6 +220,94 @@
     <div class="modal-footer">
       <button onclick="closeModal()" class="btn-secondary">Cancelar</button>
       <button onclick="savePage()" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: NUEVO GRUPO -->
+<div id="modal-group" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-group')">
+  <div class="modal modal-sm">
+    <div class="modal-header">
+      <h3 id="modal-group-title">Nuevo grupo</h3>
+      <button onclick="closeGroupModal()" class="btn-icon">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="group-id"/>
+      <label>Nombre del grupo</label>
+      <input type="text" id="group-name" placeholder="Universidad, Para papá, Personal..."/>
+      <label>Emoji / ícono (opcional)</label>
+      <div class="emoji-picker" id="emoji-picker">
+        <button class="emoji-opt selected" data-emoji="📁" onclick="selectEmoji(this)">📁</button>
+        <button class="emoji-opt" data-emoji="🎓" onclick="selectEmoji(this)">🎓</button>
+        <button class="emoji-opt" data-emoji="👨‍👩‍👧‍👦" onclick="selectEmoji(this)">👨‍👩‍👧‍👦</button>
+        <button class="emoji-opt" data-emoji="💼" onclick="selectEmoji(this)">💼</button>
+        <button class="emoji-opt" data-emoji="❤️" onclick="selectEmoji(this)">❤️</button>
+        <button class="emoji-opt" data-emoji="👤" onclick="selectEmoji(this)">👤</button>
+        <button class="emoji-opt" data-emoji="🌐" onclick="selectEmoji(this)">🌐</button>
+        <button class="emoji-opt" data-emoji="🧪" onclick="selectEmoji(this)">🧪</button>
+        <button class="emoji-opt" data-emoji="⭐" onclick="selectEmoji(this)">⭐</button>
+        <button class="emoji-opt" data-emoji="🏠" onclick="selectEmoji(this)">🏠</button>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeGroupModal()" class="btn-secondary">Cancelar</button>
+      <button onclick="saveGroup()" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: SUBIR ARCHIVO -->
+<div id="modal-file" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-file')">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>Subir archivo</h3>
+      <button onclick="closeFileModal()" class="btn-icon">✕</button>
+    </div>
+    <div class="modal-body">
+      <label>Nombre del archivo</label>
+      <input type="text" id="file-name" placeholder="index.html, app.js, style.css..."/>
+      <label>Tipo</label>
+      <select id="file-type">
+        <option value="html">HTML</option>
+        <option value="css">CSS</option>
+        <option value="js">JavaScript</option>
+        <option value="json">JSON</option>
+        <option value="txt">Texto</option>
+        <option value="other">Otro</option>
+      </select>
+      <label>Contenido</label>
+      <textarea id="file-content" placeholder="Pega aquí el contenido del archivo..." rows="10" style="font-family:monospace;font-size:12px;resize:vertical;"></textarea>
+      <div class="file-upload-alt">
+        <span>— o —</span>
+        <label class="btn-secondary btn-sm file-pick-label">
+          Seleccionar archivo local
+          <input type="file" id="file-local-input" style="display:none;" onchange="loadLocalFile(this)"/>
+        </label>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeFileModal()" class="btn-secondary">Cancelar</button>
+      <button onclick="saveFile()" class="btn-primary">Guardar</button>
+    </div>
+  </div>
+</div>
+
+<!-- MODAL: VER/EDITAR ARCHIVO -->
+<div id="modal-file-view" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-file-view')">
+  <div class="modal modal-wide">
+    <div class="modal-header">
+      <h3 id="file-view-name">archivo.html</h3>
+      <div style="display:flex;gap:6px;">
+        <button onclick="downloadFile()" class="btn-secondary btn-sm">Descargar</button>
+        <button onclick="closeFileViewModal()" class="btn-icon">✕</button>
+      </div>
+    </div>
+    <div class="modal-body" style="padding:0;">
+      <textarea id="file-view-content" style="width:100%;height:400px;font-family:monospace;font-size:12px;border:none;padding:16px;background:var(--bg);color:var(--text);resize:vertical;outline:none;"></textarea>
+    </div>
+    <div class="modal-footer">
+      <button onclick="closeFileViewModal()" class="btn-secondary">Cancelar</button>
+      <button onclick="updateFileContent()" class="btn-primary">Guardar cambios</button>
     </div>
   </div>
 </div>
