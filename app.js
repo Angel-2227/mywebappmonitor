@@ -96,6 +96,7 @@ window.switchView = (viewName, btn) => {
     populateFilesPageSelect();
     renderFilesGroupFilter();
   }
+  if (viewName === "ai" && typeof aiInit === "function") aiInit();
 };
 
 // ─────────────────────────────────────────────
@@ -1057,3 +1058,5 @@ function showToast(msg, type = "success") {
   t.classList.remove("hidden");
   setTimeout(() => t.classList.add("hidden"), 3000);
 }
+// ─── Módulo IA ────────────────────────────────
+import("./ai.js").catch(e => console.warn("ai.js no cargado:", e));

@@ -63,6 +63,15 @@
         <svg width="15" height="15" viewBox="0 0 16 16"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9.5 9.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
         API Keys
       </button>
+      <button class="nav-item" data-view="ai" onclick="switchView('ai', this)">
+        <svg width="15" height="15" viewBox="0 0 16 16" fill="none">
+          <circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/>
+          <path d="M5.5 9.5C5.5 9.5 6.5 11 8 11C9.5 11 10.5 9.5 10.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/>
+          <circle cx="6" cy="7" r="1" fill="currentColor"/>
+          <circle cx="10" cy="7" r="1" fill="currentColor"/>
+        </svg>
+        Asistente IA
+      </button>
     </nav>
 
     <div class="sidebar-filters">
@@ -183,6 +192,75 @@
       </div>
       <div class="keys-list" id="keys-list">
         <div class="empty-state"><p>No hay API Keys guardadas.</p></div>
+      </div>
+    </div>
+
+    <!-- VISTA: ASISTENTE IA -->
+    <div id="view-ai" class="view hidden">
+      <div class="topbar">
+        <div class="topbar-left">
+          <h2>Asistente IA</h2>
+          <span class="ai-model-badge">Claude claude-sonnet-4-20250514</span>
+        </div>
+        <div style="display:flex;gap:8px;align-items:center;">
+          <select id="ai-page-select" class="select-inline" onchange="aiSelectPage(this.value)">
+            <option value="">— Sin contexto de página —</option>
+          </select>
+          <button class="btn-icon" onclick="aiClearChat()" title="Nueva conversación">
+            <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M2 8a6 6 0 1012 0A6 6 0 002 8z" stroke="currentColor" stroke-width="1.5"/><path d="M8 5v3l2 2" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/><path d="M3 3l10 10" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/></svg>
+            Nueva
+          </button>
+        </div>
+      </div>
+
+      <!-- Contexto cargado -->
+      <div id="ai-context-bar" class="ai-context-bar hidden">
+        <svg width="13" height="13" viewBox="0 0 16 16" fill="none"><path d="M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5"/><path d="M9 2v4h4" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>
+        <span id="ai-context-label">Cargando archivos...</span>
+        <span id="ai-context-count" class="ai-ctx-count"></span>
+        <button class="ai-ctx-clear" onclick="aiClearContext()" title="Quitar contexto">✕</button>
+      </div>
+
+      <!-- Área de mensajes -->
+      <div class="ai-messages" id="ai-messages">
+        <div class="ai-welcome">
+          <div class="ai-welcome-icon">
+            <svg width="32" height="32" viewBox="0 0 32 32" fill="none">
+              <circle cx="16" cy="16" r="14" stroke="var(--purple)" stroke-width="1.5" fill="var(--purple-light)"/>
+              <path d="M10 19C10 19 12 22 16 22C20 22 22 19 22 19" stroke="var(--purple)" stroke-width="1.5" stroke-linecap="round"/>
+              <circle cx="12" cy="14" r="1.5" fill="var(--purple)"/>
+              <circle cx="20" cy="14" r="1.5" fill="var(--purple)"/>
+            </svg>
+          </div>
+          <h3>Hola, soy tu asistente de código</h3>
+          <p>Selecciona una página del menú de arriba para darme acceso a sus archivos, luego pregúntame lo que necesites: cómo cambiar algo, dónde buscar un bug, sugerencias de mejora, o pídeme código corregido.</p>
+          <div class="ai-suggestions">
+            <button class="ai-suggestion-chip" onclick="aiUseSuggestion(this)">¿Cómo agrego dark mode?</button>
+            <button class="ai-suggestion-chip" onclick="aiUseSuggestion(this)">Revisa si hay bugs en el código</button>
+            <button class="ai-suggestion-chip" onclick="aiUseSuggestion(this)">¿Cómo optimizo el rendimiento?</button>
+            <button class="ai-suggestion-chip" onclick="aiUseSuggestion(this)">Sugiere mejoras de UX</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Input -->
+      <div class="ai-input-area">
+        <div class="ai-input-wrap">
+          <textarea
+            id="ai-input"
+            class="ai-textarea"
+            placeholder="Pregunta sobre tu código... (Enter para enviar, Shift+Enter para nueva línea)"
+            rows="1"
+            onkeydown="aiHandleKey(event)"
+            oninput="aiAutoResize(this)"
+          ></textarea>
+          <button class="ai-send-btn" id="ai-send-btn" onclick="aiSend()" title="Enviar">
+            <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
+              <path d="M2 14L14 8L2 2V6.5L10 8L2 9.5V14Z" fill="currentColor"/>
+            </svg>
+          </button>
+        </div>
+        <div class="ai-input-hint">El contexto de los archivos se envía automáticamente con cada mensaje.</div>
       </div>
     </div>
 
