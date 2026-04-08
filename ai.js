@@ -6,7 +6,7 @@
 //
 //  ⚠️  CONFIGURA ESTA URL con la de tu Worker de Cloudflare:
 // ─────────────────────────────────────────────
-const AI_PROXY_URL = "https://anthropic-proxy.TU-SUBDOMINIO.workers.dev";
+const AI_PROXY_URL = "anthropic-webappmonitor-proxy.mwp.workers.dev";
 //  ^^ Reemplaza esto con la URL real de tu Worker ^^
 
 // Estado del módulo IA
