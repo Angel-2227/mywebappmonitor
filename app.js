@@ -242,7 +242,18 @@ async function loadPages() {
   if (!currentUser) return;
   const snap = await getDocs(collection(db, "users", currentUser.uid, "pages"));
   allPages = [];
-  snap.forEach(d => allPages.push({ id: d.id, ...d.data() }));
+  snap.forEach(d => allPages.push({ id: d.id, _fileCount: 0, ...d.data() }));
+
+  // Contar archivos de cada página en paralelo (para el badge)
+  await Promise.all(allPages.map(async page => {
+    try {
+      const filesSnap = await getDocs(collection(db, "users", currentUser.uid, "pages", page.id, "files"));
+      page._fileCount = filesSnap.size;
+    } catch (_) {
+      page._fileCount = 0;
+    }
+  }));
+
   renderPages();
 }
 
@@ -284,6 +295,11 @@ function renderPages() {
       ? `<span class="tag tag-group">${group.emoji || "📁"} ${escHtml(group.name)}</span>`
       : "";
 
+    const fileCount = page._fileCount || 0;
+    const fileBadge = fileCount > 0
+      ? `<span class="tag tag-files" title="${fileCount} archivo${fileCount !== 1 ? "s" : ""} subido${fileCount !== 1 ? "s" : ""}">📂 ${fileCount}</span>`
+      : `<span class="tag tag-no-files" title="Sin archivos subidos">📭 Sin código</span>`;
+
     const previewHtml = page.url ? `
       <div class="preview-iframe-wrap">
         <iframe src="${escHtml(page.url)}" loading="lazy" sandbox="allow-same-origin allow-scripts" title="preview"></iframe>
@@ -313,6 +329,7 @@ function renderPages() {
           <div style="display:flex;gap:4px;flex-wrap:wrap;">
             <span class="tag">${escHtml(page.provider || "")}</span>
             ${groupTag}
+            ${fileBadge}
           </div>
           <div class="card-actions">
             <button onclick="openInViewer('${escAttr(page.url)}', '${escAttr(page.name)}')" title="Ver en visor" class="btn-icon-sm">
@@ -547,6 +564,11 @@ window.loadFilesForPage = async (pageId) => {
 
   try {
     const snap = await getDocs(collection(db, "users", currentUser.uid, "pages", pageId, "files"));
+
+    // Actualizar contador local para el badge de la tarjeta
+    const pageRef = allPages.find(p => p.id === pageId);
+    if (pageRef) pageRef._fileCount = snap.size;
+
     if (snap.empty) {
       section.innerHTML = buildDropZoneHtml() + `
         <div class="file-upload-info">

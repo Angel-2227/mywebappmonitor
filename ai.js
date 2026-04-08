@@ -1,12 +1,13 @@
 // ─────────────────────────────────────────────
 //  ASISTENTE IA — ai.js
-//  Usa la Anthropic API (claude-sonnet-4-20250514) con contexto de los
-//  archivos guardados en Firestore para la página seleccionada.
 //
-//  Este módulo NO necesita API key propia: el endpoint de Anthropic ya
-//  está disponible desde claude.ai. Si despliegas la app fuera de
-//  claude.ai, necesitarás un proxy backend con tu propia ANTHROPIC_API_KEY.
+//  Usa un Cloudflare Worker como proxy para la Anthropic API,
+//  evitando exponer la API key en el frontend.
+//
+//  ⚠️  CONFIGURA ESTA URL con la de tu Worker de Cloudflare:
 // ─────────────────────────────────────────────
+const AI_PROXY_URL = "https://anthropic-proxy.TU-SUBDOMINIO.workers.dev";
+//  ^^ Reemplaza esto con la URL real de tu Worker ^^
 
 // Estado del módulo IA
 let aiHistory = [];           // [{role, content}] historial de la conversación
@@ -30,6 +31,10 @@ function populateAiPageSelect() {
       const opt = document.createElement("option");
       opt.value = p.id;
       opt.textContent = p.name;
+      // Indicador visual de si tiene archivos
+      if (p._fileCount > 0) {
+        opt.textContent = p.name + " 📂";
+      }
       sel.appendChild(opt);
     });
   }
@@ -43,7 +48,7 @@ window.aiSelectPage = async function(pageId) {
     return;
   }
 
-  const contextBar  = document.getElementById("ai-context-bar");
+  const contextBar   = document.getElementById("ai-context-bar");
   const contextLabel = document.getElementById("ai-context-label");
   const contextCount = document.getElementById("ai-context-count");
 
@@ -52,7 +57,6 @@ window.aiSelectPage = async function(pageId) {
   contextCount.textContent = "";
 
   try {
-    // Leer archivos de Firestore (reutiliza las funciones de app.js)
     const { getDocs, collection, getFirestore } = await import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js");
     const db = getFirestore();
     const uid = currentUser?.uid;
@@ -143,7 +147,6 @@ Si ves un bug, señálalo con precisión (línea o función aproximada).`;
         : f.type === "json" ? "json"
         : "text";
 
-      // Truncar archivos muy grandes para no superar el context window
       const maxChars = 12000;
       const content = f.content.length > maxChars
         ? f.content.slice(0, maxChars) + "\n\n... [archivo truncado, muestra los primeros 12000 caracteres]"
@@ -171,27 +174,22 @@ window.aiSend = async function() {
   input.value = "";
   aiAutoResize(input);
 
-  // Agregar mensaje del usuario al historial y al DOM
   aiHistory.push({ role: "user", content: text });
   appendMessage("user", text);
 
-  // Mostrar typing indicator
   const typingEl = appendTyping();
   setAiLoading(true);
 
   try {
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const response = await fetch(AI_PROXY_URL, {
       method: "POST",
       headers: {
-        "Content-Type": "application/json",
-        "anthropic-version": "2023-06-01",
-        "anthropic-dangerous-direct-browser-access": "true"
+        "Content-Type": "application/json"
       },
       body: JSON.stringify({
         model: "claude-sonnet-4-20250514",
         max_tokens: 4096,
         system: buildSystemPrompt(),
-        // Enviar el historial completo para mantener contexto conversacional
         messages: aiHistory
       })
     });
@@ -204,16 +202,14 @@ window.aiSend = async function() {
     const data = await response.json();
     const assistantText = data.content?.[0]?.text || "(Sin respuesta)";
 
-    // Guardar respuesta en historial
     aiHistory.push({ role: "assistant", content: assistantText });
 
-    // Reemplazar typing por el mensaje real
     typingEl.remove();
     appendMessage("assistant", assistantText);
 
   } catch (e) {
     typingEl.remove();
-    appendMessage("assistant", `⚠️ Error al contactar la IA: ${e.message}\n\nAsegúrate de que estás usando la app desde **claude.ai** o configura un proxy con tu propia API key de Anthropic.`);
+    appendMessage("assistant", `⚠️ Error al contactar la IA: ${e.message}\n\nAsegúrate de que el Worker de Cloudflare está desplegado y de que \`AI_PROXY_URL\` en ai.js apunta a tu Worker.`);
   } finally {
     setAiLoading(false);
   }
@@ -225,7 +221,6 @@ function renderAiMessages() {
   container.innerHTML = "";
 
   if (aiHistory.length === 0) {
-    // Mostrar pantalla de bienvenida
     container.innerHTML = `
       <div class="ai-welcome">
         <div class="ai-welcome-icon">
@@ -256,7 +251,6 @@ function renderAiMessages() {
 function appendMessage(role, text) {
   const container = document.getElementById("ai-messages");
 
-  // Quitar bienvenida si existe
   const welcome = container.querySelector(".ai-welcome");
   if (welcome) welcome.remove();
 
@@ -271,7 +265,6 @@ function appendMessage(role, text) {
 
   container.appendChild(el);
 
-  // Agregar botones de copiar a los bloques de código
   el.querySelectorAll("pre").forEach(pre => {
     const wrap = document.createElement("div");
     wrap.className = "ai-code-wrap";
@@ -288,7 +281,6 @@ function appendMessage(role, text) {
     wrap.appendChild(btn);
   });
 
-  // Scroll al fondo
   container.scrollTop = container.scrollHeight;
   return el;
 }
@@ -322,35 +314,25 @@ function setAiLoading(loading) {
 
 // ─── Formateo de markdown básico ───────────────
 function formatAiText(text) {
-  // Escapar HTML primero (excepto lo que vamos a renderizar)
   let html = text
-    // Bloques de código con lenguaje: ```lang\n...\n```
     .replace(/```(\w*)\n?([\s\S]*?)```/g, (_, lang, code) => {
       const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<pre><code class="lang-${lang || 'text'}">${escaped.trim()}</code></pre>`;
     })
-    // Código inline: `code`
     .replace(/`([^`\n]+)`/g, (_, code) => {
       const escaped = code.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
       return `<code>${escaped}</code>`;
     })
-    // **negrita**
     .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
-    // *itálica*
     .replace(/\*(.+?)\*/g, "<em>$1</em>")
-    // Títulos ## y ###
     .replace(/^### (.+)$/gm, "<strong>$1</strong>")
     .replace(/^## (.+)$/gm, "<strong>$1</strong>")
-    // Listas - item
     .replace(/^- (.+)$/gm, "<li>$1</li>")
-    // Saltos de línea dobles = párrafo
     .split(/\n\n+/).map(block => {
       if (block.startsWith("<li>") || block.includes("</pre>") || block.includes("<strong>")) return block;
-      // Convertir saltos simples dentro de párrafos
       return "<p>" + block.replace(/\n/g, "<br>") + "</p>";
     }).join("\n");
 
-  // Envolver listas
   html = html.replace(/(<li>.*?<\/li>\n?)+/gs, match => `<ul>${match}</ul>`);
 
   return html;

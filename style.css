@@ -125,6 +125,8 @@ body { font-family: system-ui, -apple-system, sans-serif; background: var(--bg);
 .tag { font-size: 10px; padding: 2px 7px; border-radius: 4px; background: var(--bg); border: 0.5px solid var(--border); color: var(--text2); }
 .tag-alt { background: var(--purple-light); color: var(--purple); border-color: transparent; }
 .tag-group { background: var(--bg); color: var(--text2); border-color: var(--border); font-size: 10px; }
+.tag-files { background: #e8f5e9; color: #2e7d32; border-color: #a5d6a7; font-size: 10px; }
+.tag-no-files { background: #fff8e1; color: #795548; border-color: #ffe082; font-size: 10px; }
 .card-actions { display: flex; gap: 2px; }
 .btn-icon-sm { width: 26px; height: 26px; border-radius: 5px; border: none; background: transparent; cursor: pointer; color: var(--text3); display: flex; align-items: center; justify-content: center; }
 .btn-icon-sm:hover { background: var(--bg); color: var(--text); }
