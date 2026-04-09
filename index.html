@@ -2,16 +2,7 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-  <meta name="mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-capable" content="yes"/>
-  <meta name="apple-mobile-web-app-status-bar-style" content="default"/>
-  <meta name="apple-mobile-web-app-title" content="MyPages"/>
-  <meta name="theme-color" content="#534AB7"/>
-  <meta name="description" content="Tu panel de proyectos web"/>
-  <link rel="manifest" href="manifest.json"/>
-  <!-- Apple touch icons -->
-  <link rel="apple-touch-icon" href="icon-192.png"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
   <title>MyPages</title>
   <link rel="stylesheet" href="style.css"/>
 </head>
@@ -40,7 +31,7 @@
 
 <!-- APP PRINCIPAL -->
 <div id="app" class="hidden">
-  <aside class="sidebar" id="sidebar">
+  <aside class="sidebar">
     <div class="sidebar-header">
       <div class="app-brand">
         <svg width="22" height="22" viewBox="0 0 36 36" fill="none">
@@ -52,7 +43,6 @@
         </svg>
         <span>MyPages</span>
       </div>
-      <button class="sidebar-close-btn" onclick="closeSidebar()" aria-label="Cerrar menú">✕</button>
     </div>
 
     <nav class="sidebar-nav">
@@ -124,9 +114,6 @@
     <div id="view-dashboard" class="view active">
       <div class="topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Menú">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
           <h2 id="dashboard-title">Mis páginas</h2>
           <span class="topbar-count" id="pages-count"></span>
         </div>
@@ -142,12 +129,7 @@
     <!-- VISTA: VISOR -->
     <div id="view-viewer" class="view hidden">
       <div class="topbar">
-        <div class="topbar-left">
-          <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Menú">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-          <h2>Visor</h2>
-        </div>
+        <h2>Visor</h2>
       </div>
       <div class="viewer-wrap">
         <div class="viewer-bar">
@@ -173,9 +155,6 @@
     <div id="view-files" class="view hidden">
       <div class="topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Menú">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
           <h2>Archivos</h2>
           <span class="topbar-count" id="files-count"></span>
         </div>
@@ -204,12 +183,7 @@
     <!-- VISTA: API KEYS -->
     <div id="view-keys" class="view hidden">
       <div class="topbar">
-        <div class="topbar-left">
-          <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Menú">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
-          <h2>API Keys</h2>
-        </div>
+        <h2>API Keys</h2>
         <button class="btn-primary" onclick="openKeyModal()">+ Nueva key</button>
       </div>
       <div class="keys-note">
@@ -225,11 +199,8 @@
     <div id="view-ai" class="view hidden">
       <div class="topbar">
         <div class="topbar-left">
-          <button class="mobile-menu-btn" onclick="openSidebar()" aria-label="Menú">
-            <svg width="18" height="18" viewBox="0 0 18 18" fill="none"><path d="M2 4h14M2 9h14M2 14h14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-          </button>
           <h2>Asistente IA</h2>
-          <span class="ai-model-badge">Sonnet 4</span>
+          <span class="ai-model-badge">Claude claude-sonnet-4-20250514</span>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
           <select id="ai-page-select" class="select-inline" onchange="aiSelectPage(this.value)">
@@ -295,33 +266,6 @@
 
   </main>
 </div>
-
-<!-- OVERLAY para cerrar sidebar en mobile -->
-<div id="sidebar-overlay" class="sidebar-overlay" onclick="closeSidebar()"></div>
-
-<!-- BARRA DE NAVEGACIÓN INFERIOR (mobile) -->
-<nav class="mobile-nav" id="mobile-nav">
-  <button class="mobile-nav-item active" data-view="dashboard" onclick="switchView('dashboard', this); setMobileNav(this)">
-    <svg width="20" height="20" viewBox="0 0 16 16"><rect x="1" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="1" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="1" y="9" width="6" height="6" rx="1.5" fill="currentColor"/><rect x="9" y="9" width="6" height="6" rx="1.5" fill="currentColor"/></svg>
-    <span>Páginas</span>
-  </button>
-  <button class="mobile-nav-item" data-view="viewer" onclick="switchView('viewer', this); setMobileNav(this)">
-    <svg width="20" height="20" viewBox="0 0 16 16"><rect x="1" y="3" width="14" height="10" rx="2" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M5 3V13" stroke="currentColor" stroke-width="1.5"/></svg>
-    <span>Visor</span>
-  </button>
-  <button class="mobile-nav-item" data-view="files" onclick="switchView('files', this); setMobileNav(this)">
-    <svg width="20" height="20" viewBox="0 0 16 16"><path d="M3 2h6l4 4v8a1 1 0 01-1 1H3a1 1 0 01-1-1V3a1 1 0 011-1z" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9 2v4h4" stroke="currentColor" stroke-width="1.5" fill="none"/></svg>
-    <span>Archivos</span>
-  </button>
-  <button class="mobile-nav-item" data-view="keys" onclick="switchView('keys', this); setMobileNav(this)">
-    <svg width="20" height="20" viewBox="0 0 16 16"><circle cx="6" cy="6" r="4" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M9.5 9.5L14 14" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    <span>Keys</span>
-  </button>
-  <button class="mobile-nav-item" data-view="ai" onclick="switchView('ai', this); setMobileNav(this)">
-    <svg width="20" height="20" viewBox="0 0 16 16" fill="none"><circle cx="8" cy="8" r="6.5" stroke="currentColor" stroke-width="1.5"/><path d="M5.5 9.5C5.5 9.5 6.5 11 8 11C9.5 11 10.5 9.5 10.5 9.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/><circle cx="6" cy="7" r="1" fill="currentColor"/><circle cx="10" cy="7" r="1" fill="currentColor"/></svg>
-    <span>IA</span>
-  </button>
-</nav>
 
 <!-- MODAL: NUEVA PÁGINA -->
 <div id="modal-page" class="modal-overlay hidden" onclick="closeModalOutside(event, 'modal-page')">
@@ -488,47 +432,5 @@
 <div id="toast" class="toast hidden"></div>
 
 <script type="module" src="app.js"></script>
-<script>
-  // Registrar Service Worker para PWA
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').catch(() => {});
-    });
-  }
-
-  // Sidebar mobile
-  function openSidebar() {
-    document.getElementById('sidebar').classList.add('open');
-    document.getElementById('sidebar-overlay').classList.add('visible');
-    document.body.style.overflow = 'hidden';
-  }
-  function closeSidebar() {
-    document.getElementById('sidebar').classList.remove('open');
-    document.getElementById('sidebar-overlay').classList.remove('visible');
-    document.body.style.overflow = '';
-  }
-
-  // Sincronizar nav mobile con sidebar
-  function setMobileNav(btn) {
-    document.querySelectorAll('.mobile-nav-item').forEach(b => b.classList.remove('active'));
-    btn.classList.add('active');
-    // Cerrar sidebar si estaba abierto en mobile
-    closeSidebar();
-  }
-
-  // Cerrar sidebar al cambiar vista desde el sidebar en mobile
-  const origSwitchView = window.switchView;
-  document.addEventListener('DOMContentLoaded', () => {
-    // Sincronizar mobile nav al hacer click en sidebar en mobile
-    document.querySelectorAll('.nav-item').forEach(navBtn => {
-      navBtn.addEventListener('click', () => {
-        const view = navBtn.dataset.view;
-        const mobileBtn = document.querySelector(`.mobile-nav-item[data-view="${view}"]`);
-        if (mobileBtn) setMobileNav(mobileBtn);
-        else closeSidebar();
-      });
-    });
-  });
-</script>
 </body>
 </html>
